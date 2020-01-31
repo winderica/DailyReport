@@ -9,5 +9,5 @@ Submit your health status to your fucking department everyday
 
 ## Q&A
 
-Q: Why no `package.json`?
+Q: Why no `package.json`?  
 A: Because I am lazyyyyyyyyyy :(
