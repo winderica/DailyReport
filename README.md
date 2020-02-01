@@ -18,6 +18,11 @@ Well, `HUST One` uses a rediculous DES algorithm written by someone a trillion y
 This algorithm, which receives 3 keys but differs a lot from Triple-DES, is not suprisingly incorrect.  
 The original script is extremely disgusting so I reimplemented it in a not so disgusting way.  
 
+*Warning*: It's not recommended to use the following script to encrypt large size of data due to
+1. low performance (**10x slower**) caused by my abuse of inline tricks
+2. no decrypt function is provided
+3. **non-ascii characters** will produce **different** cipher from the original script
+
 ```js
 const des = (data, k1, k2, k3) => {
     const getBytes = str => str.split('').map(i => i.charCodeAt(0).toString(2).padStart(16, '0')).join('').padEnd(64, '0').split('').map(Number);
