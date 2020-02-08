@@ -4,18 +4,8 @@ const config = require('./config.json');
 // const config = {
 //     username: 'U2010xxxxx',
 //     password: 'P@ssw0rd',
-//     first: false, // the following fields are unnecessary if `first` is `false`
-//     institute: '',
-//     remark: '',
-//     idCardFirstSixDigits: '', // eg. 110101 in 110101198306197082
-//     province: '',
-//     city: '',
-//     county: '',
-//     address: '',
-//     emergencyContact: '',
-//     emergencyContactPhone: '',
 // };
-const { username, password, first, institute, remark, idCardFirstSixDigits, city, province, county, address, emergencyContact, emergencyContactPhone } = config;
+const { username, password } = config;
 
 let COOKIE;
 let CSRF_TOKEN;
@@ -33,11 +23,7 @@ const CONTENT_TYPE = 'application/x-www-form-urlencoded; charset=utf-8';
 
 const getReferrer = stepId => stepId ? `https://yqtb.hust.edu.cn/infoplus/form/${stepId}/render` : API_ENTRY_POINT;
 const getHeaders = stepId => ({
-    Host: 'yqtb.hust.edu.cn',
-    'User-Agent': 'Mozilla/5.0',
-    'Accept-Language': 'en-US,en;q=0.5',
     'Content-Type': CONTENT_TYPE,
-    Origin: 'https://yqtb.hust.edu.cn',
     Referer: getReferrer(stepId),
     Cookie: COOKIE
 });
@@ -212,16 +198,7 @@ const submit = async (stepId, differ) => {
 
 const diffField1 = (stepId, data) => JSON.stringify({
     ...data,
-    ...Object.fromEntries([
-        "_VAR_ENTRY_NUMBER",
-        "_VAR_NOW",
-        "_VAR_NOW_DAY",
-        "_VAR_NOW_MONTH",
-        "_VAR_NOW_YEAR",
-        "_VAR_RELEASE",
-        "_VAR_STEP_NUMBER"
-    ].map(i => [i, data[i].toString()])), // Fuck
-    "fieldSFZCTX": first ? "1" : "2", // 是否再次填报 1首次填报 2再次填报
+    "fieldSFZCTX": "2", // 是否再次填报 1首次填报 2再次填报
     "fieldSFYFSZZ": "2", // 身体健康状况是否发生变化 1是 2否
     "_VAR_ENTRY_NAME": "学生身体健康状况上报(_)",
     "_VAR_ENTRY_TAGS": "健康状况上报",
@@ -247,52 +224,47 @@ const diffField1 = (stepId, data) => JSON.stringify({
 
 const diffField2 = (stepId, data) => JSON.stringify({
     ...data,
-    ...Object.fromEntries([
-        "_VAR_ENTRY_NUMBER",
-        "_VAR_NOW",
-        "_VAR_NOW_DAY",
-        "_VAR_NOW_MONTH",
-        "_VAR_NOW_YEAR",
-        "_VAR_RELEASE",
-        "_VAR_STEP_NUMBER"
-    ].map(i => [i, data[i].toString()])), // Fuck
-    "fieldSFZCTX": first ? "1" : "2", // 是否再次填报 1首次填报 2再次填报
-    "_VAR_ENTRY_NAME": `学生身体健康状况上报(_${institute})`,
+    "_VAR_ENTRY_NAME": `学生身体健康状况上报(_${data.fieldSqYx_Name})`,
     "_VAR_URL": getReferrer(stepId),
-    "fieldBZ": remark, // 备注
-    "fieldCS": idCardFirstSixDigits.slice(0, 4) + '00', // 城市
-    "fieldCS_Attr": { "_parent": +(idCardFirstSixDigits.slice(0, 2) + '0000') },
-    "fieldCS_Name": city,
-    "fieldDQ": idCardFirstSixDigits, // 地区
-    "fieldDQSZWZ": "2", // 当前所处位置 1校内 2校外
-    "fieldDQ_Attr": { "_parent": +(idCardFirstSixDigits.slice(0, 4) + '00') },
-    "fieldDQ_Name": county,
-    "fieldGLSJ": "", // 发热且隔离时间
-    "fieldJTDD": address, // 具体地点
-    "fieldPCSJ": "", // 疑似转排除时间
-    "fieldQRYSSJ": "", // 确认疑似时间
-    "fieldQZSJ": "", // 确诊时间
-    "fieldSF": idCardFirstSixDigits.slice(0, 2) + '0000', // 省份名称
-    "fieldSFWQZYSBL": "2", // 是否为确诊、疑似病例的密切接触者 1是 2否
-    "fieldSF_Name": province,
-    "fieldSqrDqwz": "中国（含港澳台地区）", // 当前位置
-    "fieldSqrDqwz_Name": "中国（含港澳台地区）",
-    "fieldSqrzzqt": "1", // 上报人前身体状况 1正常 2未发热隔离 3 发热隔离 4疑似 5疑似转排除 6确诊 7已治愈
-    "fieldWFRGLSJ": "", // "未发热且隔离时间"
-    "fieldXBFZ_Name": "", // ???
-    "fieldXkyxSyr": emergencyContact, // 紧急联系人姓名
-    "fieldXkyxYxm": emergencyContactPhone, // 紧急联系人电话
-    "fieldZYSJ": "" // 治愈时间
+    "fieldBZ": "无",
+    "fieldBrsffr": "20",
+    "fieldBrsffr1": "2",
+    "fieldBrsfks": "2",
+    "fieldCS_Attr": JSON.stringify({ "_parent": data.fieldSF }),
+    "fieldDQSZWZ": "2",
+    "fieldDQ_Attr": JSON.stringify({ "_parent": data.fieldCS }),
+    "fieldGLDD": "",
+    "fieldGLSJ": "",
+    "fieldJSSFKS": ["2", "2"],
+    "fieldJSSFQC": ["2", "2"],
+    "fieldJSTW": [
+        (Math.random() * 0.5 + 36.5).toFixed(1),
+        (Math.random() * 0.5 + 36.5).toFixed(1)
+    ],
+    "fieldJZQK": "",
+    "fieldJZYY": "",
+    "fieldMQJCRXM": ["父亲", "母亲"],
+    "fieldMQJCRY": "",
+    "fieldPCSJ": "",
+    "fieldQRYSSJ": "",
+    "fieldQZSJ": "",
+    "fieldSFWQZYSBL": "2",
+    "fieldSFYFSZZ": "2",
+    "fieldSFZCTX": "2",
+    "fieldSFZWGL": "",
+    "fieldSqrzzqt": "1",
+    "fieldWFRGLSJ": "",
+    "fieldXBFZ_Name": "",
+    "fieldXSZLB": (Math.random() * 0.5 + 36.5).toFixed(1),
+    "groupMQJCList": [0, 1]
 });
 
 const fuck = async () => {
     await login(username, password);
     const firstStep = await start();
-    console.log(getReferrer(firstStep));
     const nextStep = await submit(firstStep, diffField1);
-    if (first) {
-        await submit(nextStep, diffField2);
-    }
+    await submit(nextStep, diffField2);
+    console.log(getReferrer(firstStep));
 };
 
 fuck();
