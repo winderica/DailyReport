@@ -1,5 +1,6 @@
 const qs = require('querystring');
-const fetch = require('node-fetch');
+const fetchBase = require('node-fetch');
+const sleep = require('util').promisify(setTimeout);
 const config = require('./config.json');
 // const config = {
 //     username: 'U2010xxxxx',
@@ -59,6 +60,11 @@ const generateForm = (object) => ({
 
 const random = () => Math.random() * 999;
 const time = () => ~~(Date.now() / 1000);
+
+const fetch = async (url, data) => {
+    await sleep(500);
+    return fetchBase(url, data);
+}
 
 const get = async (url, headers, body) => await fetch(url, {
     headers,
@@ -141,33 +147,6 @@ const render = async (stepId) => {
     return { instanceId, data, fields, actionId };
 };
 
-const progress = async (stepId, instanceId) => {
-    const form = generateForm({
-        stepId,
-    });
-    const res = await post(API_PROGRESS(instanceId), getHeaders(stepId), form);
-    const { errno } = res;
-    if (errno !== 0) {
-        throw new Error("Failed to post /progress: " + JSON.stringify(res));
-    }
-};
-
-const listNextStepsUsers = async (stepId, actionId, formData, boundFields) => {
-    const form = generateForm({
-        stepId,
-        actionId,
-        formData,
-        timestamp: time(),
-        rand: random(),
-        boundFields,
-    });
-    const res = await post(API_LIST_NEXT_STEPS_USERS, getHeaders(stepId), form);
-    const { errno } = res;
-    if (errno !== 0) {
-        throw new Error("Failed to post /listNextStepsUsers: " + JSON.stringify(res));
-    }
-};
-
 const doAction = async (stepId, actionId, formData, boundFields) => {
     const form = generateForm({
         stepId,
@@ -189,10 +168,8 @@ const doAction = async (stepId, actionId, formData, boundFields) => {
 
 const submit = async (stepId, differ) => {
     const { data, instanceId, fields, actionId } = await render(stepId);
-    await progress(stepId, instanceId);
     const boundFields = Object.entries(fields).filter(([, v]) => v.bound).map(([k]) => k).toString();
     const formData = differ(stepId, data);
-    await listNextStepsUsers(stepId, actionId, formData, boundFields);
     return await doAction(stepId, actionId, formData, boundFields);
 };
 
