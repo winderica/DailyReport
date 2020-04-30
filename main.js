@@ -1,5 +1,7 @@
 const qs = require('querystring');
 const fetchBase = require('node-fetch');
+const sharp = require('sharp');
+const { createWorker, PSM } = require('tesseract.js');
 const sleep = require('util').promisify(setTimeout);
 const config = require('./config.json');
 // const config = {
@@ -11,21 +13,23 @@ const { username, password } = config;
 let COOKIE;
 let CSRF_TOKEN;
 
-const API_ENTRY_POINT = 'https://yqtb.hust.edu.cn/infoplus/form/BKS/start';
-const API_LOGIN = 'https://pass.hust.edu.cn/cas/login';
-const API_LOGIN_FINISHED = `https://yqtb.hust.edu.cn/infoplus/login?${qs.stringify({ retUrl: API_ENTRY_POINT })}`;
-const API_START = 'https://yqtb.hust.edu.cn/infoplus/interface/start';
-const API_RENDER = 'https://yqtb.hust.edu.cn/infoplus/interface/render';
-const API_PROGRESS = (instance) => `https://yqtb.hust.edu.cn/infoplus/interface/instance/${instance}/progress`;
-const API_LIST_NEXT_STEPS_USERS = 'https://yqtb.hust.edu.cn/infoplus/interface/listNextStepsUsers';
-const API_DO_ACTION = 'https://yqtb.hust.edu.cn/infoplus/interface/doAction';
+const API_PASS = 'https://pass.hust.edu.cn/cas';
+const API_YQTB = 'https://yqtb.hust.edu.cn/infoplus';
+
+const API_ENTRY_POINT = `${API_YQTB}/form/BKS/start`;
+const API_LOGIN = `${API_PASS}/login`;
+const API_CAPTCHA = `${API_PASS}/code`;
+const API_LOGIN_FINISHED = `${API_YQTB}/login?${qs.stringify({ retUrl: API_ENTRY_POINT })}`;
+const API_START = `${API_YQTB}/interface/start`;
+const API_RENDER = `${API_YQTB}/interface/render`;
+const API_DO_ACTION = `${API_YQTB}/interface/doAction`;
 
 const CONTENT_TYPE = 'application/x-www-form-urlencoded; charset=utf-8';
 
-const getReferrer = stepId => stepId ? `https://yqtb.hust.edu.cn/infoplus/form/${stepId}/render` : API_ENTRY_POINT;
-const getHeaders = stepId => ({
+const referrer = stepId => stepId ? `${API_YQTB}/form/${stepId}/render` : API_ENTRY_POINT;
+const postHeaders = stepId => ({
     'Content-Type': CONTENT_TYPE,
-    Referer: getReferrer(stepId),
+    Referer: referrer(stepId),
     Cookie: COOKIE
 });
 
@@ -83,23 +87,52 @@ const post = async (url, headers, body) => {
     if (res.ok) {
         return res.json();
     } else {
-        throw new Error("Fetch failed: " + await res.text())
+        throw new Error("Fetch failed: " + await res.text());
     }
 };
+const getCookie = (res) => {
+    return res.headers.raw()['set-cookie'].map(i => i.split(';')[0]).join('; ');
+}
+
+const recognize = async (buffer) => {
+    await sharp(buffer, { page: 1 })
+        .extract({ left: 0, top: 19, width: 85, height: 20 })
+        .toColourspace('b-w')
+        .threshold(254)
+        .extend({
+            top: 5,
+            bottom: 5,
+            left: 5,
+            right: 5,
+            background: { r: 255, g: 255, b: 255, alpha: 1 }
+        }).toFile('./temp.png');
+    const worker = createWorker();
+    await worker.load();
+    await worker.loadLanguage('eng');
+    await worker.initialize('eng');
+    await worker.setParameters({
+        tessedit_char_whitelist: '0123456789',
+        tessedit_pageseg_mode: PSM.SINGLE_LINE
+    });
+    const { data: { text } } = await worker.recognize('./temp.png', 'eng');
+    await worker.terminate();
+    return text.slice(0, 4);
+}
 
 const login = async (username, password) => {
-    COOKIE = (await get(API_ENTRY_POINT)).headers.raw()['set-cookie'].map(i => i.split(';')[0]).join('; ');
+    COOKIE = getCookie(await get(API_ENTRY_POINT));
     const queryString = qs.stringify({ service: API_LOGIN_FINISHED });
-    const url = `${API_LOGIN}?${queryString}`;
-    const res = await get(url);
-    const cookie = res.headers.raw()['set-cookie'].map(i => i.split(';')[0]).join('; ');
+    const res = await get(`${API_LOGIN}?${queryString}`);
+    const cookie = getCookie(res);
     const jsessionid = cookie.match(/(?<=JSESSIONID=).*?(?=;)/g)[0];
     const lt = (await res.text()).match(/LT-.*?-cas/g)[0];
+    const code = await recognize(await (await get(API_CAPTCHA, { Cookie: cookie })).buffer());
     const form = {
         ul: username.length,
         pl: password.length,
         lt,
         rsa: des(username + password + lt, '1', '2', '3'),
+        code,
         execution: 'e1s1', // e: count of GET, s: MAYBE count of (invalid) POST
         _eventId: 'submit'
     };
@@ -108,10 +141,12 @@ const login = async (username, password) => {
         { 'Content-Type': CONTENT_TYPE, Cookie: cookie },
         form
     )).headers.get('Location');
-    const headers = { Cookie: COOKIE };
-    await get(redirect, headers);
-    await get(API_LOGIN_FINISHED, headers);
-    CSRF_TOKEN = (await (await get(API_ENTRY_POINT, headers)).text()).match(/(?<=itemscope="csrfToken" content=").*?(?=">)/g)[0];
+    if (!redirect) {
+        throw new Error("Failed to login");
+    }
+    await get(redirect, { Cookie: COOKIE });
+    await get(API_LOGIN_FINISHED, { Cookie: COOKIE });
+    CSRF_TOKEN = (await (await get(API_ENTRY_POINT, { Cookie: COOKIE })).text()).match(/(?<=itemscope="csrfToken" content=").*?(?=">)/g)[0];
 };
 
 const start = async () => {
@@ -123,10 +158,10 @@ const start = async () => {
             _VAR_URL_Attr: {}
         })
     });
-    const res = await post(API_START, getHeaders(), form);
+    const res = await post(API_START, postHeaders(), form);
     const { errno, entities } = res;
     if (errno !== 0) {
-        throw new Error("Failed to post /start" + JSON.stringify(res));
+        throw new Error(`Failed to post /start: ${JSON.stringify(res)}`);
     }
     return +entities[0].match(/\d+/)[0];
 };
@@ -138,13 +173,13 @@ const render = async (stepId) => {
         rand: random(),
         width: 1536,
     });
-    const res = await post(API_RENDER, getHeaders(stepId), form);
+    const res = await post(API_RENDER, postHeaders(stepId), form);
     const { errno, entities } = res;
     if (errno !== 0) {
-        throw new Error("Failed to post /render" + JSON.stringify(res));
+        throw new Error(`Failed to post /render: ${JSON.stringify(res)}`);
     }
-    const { step: { instanceId, stepId: actionId }, data, fields } = entities[0]; // Fuck, stepId in response is actually actionId
-    return { instanceId, data, fields, actionId };
+    const { step: { stepId: actionId }, data, fields } = entities[0]; // Fuck, stepId in response is actually actionId
+    return { data, fields, actionId };
 };
 
 const doAction = async (stepId, actionId, formData, boundFields) => {
@@ -158,16 +193,16 @@ const doAction = async (stepId, actionId, formData, boundFields) => {
         timestamp: time(),
         boundFields,
     });
-    const res = await post(API_DO_ACTION, getHeaders(stepId), form);
+    const res = await post(API_DO_ACTION, postHeaders(stepId), form);
     const { errno, entities } = res;
     if (errno !== 0) {
-        throw new Error("Failed to post /doAction: " + JSON.stringify(res));
+        throw new Error(`Failed to post /doAction: ${JSON.stringify(res)}`);
     }
     return entities[0].flowStepId;
 };
 
 const submit = async (stepId, differ) => {
-    const { data, instanceId, fields, actionId } = await render(stepId);
+    const { data, fields, actionId } = await render(stepId);
     const boundFields = Object.entries(fields).filter(([, v]) => v.bound).map(([k]) => k).toString();
     const formData = differ(stepId, data);
     return await doAction(stepId, actionId, formData, boundFields);
@@ -179,7 +214,7 @@ const diffField1 = (stepId, data) => JSON.stringify({
     "fieldSFYFSZZ": "2", // 身体健康状况是否发生变化 1是 2否
     "_VAR_ENTRY_NAME": "学生身体健康状况上报(_)",
     "_VAR_ENTRY_TAGS": "健康状况上报",
-    "_VAR_URL": getReferrer(stepId),
+    "_VAR_URL": referrer(stepId),
     "_VAR_URL_Attr": "{}",
     "fieldCSNY": "", // 出生年月
     "fieldCS_Attr": JSON.stringify({ "_parent": "" }),
@@ -202,7 +237,7 @@ const diffField1 = (stepId, data) => JSON.stringify({
 const diffField2 = (stepId, data) => JSON.stringify({
     ...data,
     "_VAR_ENTRY_NAME": `学生身体健康状况上报(_${data.fieldSqYx_Name})`,
-    "_VAR_URL": getReferrer(stepId),
+    "_VAR_URL": referrer(stepId),
     "fieldBZ": "无",
     "fieldBrsffr": "20",
     "fieldBrsffr1": "2",
@@ -241,7 +276,7 @@ const fuck = async () => {
     const firstStep = await start();
     const nextStep = await submit(firstStep, diffField1);
     await submit(nextStep, diffField2);
-    console.log(getReferrer(firstStep));
+    console.log(referrer(firstStep));
 };
 
 fuck();
