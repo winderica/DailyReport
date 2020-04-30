@@ -3,7 +3,7 @@ Submit your health status to your fucking department everyday
 
 ## Usage
 
-1. install the only dependency `node-fetch`
+1. install dependencies: `node-fetch`, `sharp` and `tesseract.js`
 2. prepare `config.json` as described in the script
 3. use crontab or something else to run it every day
     * Tips: `0 12 * * * sleep $(( RANDOM \% 21600 )); node /path/to/fuck.js` will run randomly from 12:00 to 18:00 everyday
@@ -12,7 +12,7 @@ Submit your health status to your fucking department everyday
 ## Q&A
 
 Q: Why no `package.json`?  
-A: Because I am lazyyyyyyyyyy :(
+A: ~~Because I am lazyyyyyyyyyy :(~~ I think it is necessary now :(
 
 ## Bonus
 
