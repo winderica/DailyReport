@@ -6,6 +6,8 @@ Submit your health status to your fucking department everyday
 1. install the only dependency `node-fetch`
 2. prepare `config.json` as described in the script
 3. use crontab or something else to run it every day
+    * Tips: `0 12 * * * sleep $(( RANDOM \% 21600 )); node /path/to/fuck.js` will run randomly from 12:00 to 18:00 everyday
+        * `$RANDOM` should be supported in your shell, or you can get a 32 bits random number by running `od -vAn -N4 -tu4 < /dev/urandom`
 
 ## Q&A
 
