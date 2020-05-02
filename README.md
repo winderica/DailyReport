@@ -10,11 +10,6 @@ Submit your health status to your fucking department everyday
     * Tips: `0 12 * * * sleep $(( RANDOM \% 21600 )); node /path/to/index.js` will run randomly from 12:00 to 18:00 everyday
         * `$RANDOM` should be supported in your shell, or you can get a 32 bits random number by running `od -vAn -N4 -tu4 < /dev/urandom`
 
-## Q&A
-
-Q: Why no `package.json`?  
-A: ~~Because I am lazyyyyyyyyyy :(~~ I think it is necessary now :(
-
 ## Bonus
 
 Well, `HUST One` uses a rediculous DES algorithm written by someone a trillion years ago to encrypt username, password and a nonce.  
