@@ -4,7 +4,7 @@ import qs from 'querystring';
 
 import { recognize } from './utils/recognize';
 
-import { des } from './utils/des';
+import { desEEE } from './utils/des';
 
 import config from '../config.json';
 // const config = {
@@ -31,7 +31,7 @@ const login = async (username: string, password: string) => {
         ul: username.length,
         pl: password.length,
         lt,
-        rsa: des(username + password + lt, '1', '2', '3'),
+        rsa: desEEE(username + password + lt, '1', '2', '3'),
         code,
         execution: 'e1s1', // e: count of GET, s: MAYBE count of (invalid) POST
         _eventId: 'submit'

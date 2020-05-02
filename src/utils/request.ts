@@ -1,6 +1,6 @@
 import { API_ENTRY_POINT, API_YQTB, CONTENT_TYPE } from '../constants';
 import { promisify } from 'util';
-import fetch, { BodyInit, HeadersInit, RequestInit, Response } from 'node-fetch';
+import fetch, { HeadersInit, RequestInit, Response } from 'node-fetch';
 import qs, { ParsedUrlQueryInput } from 'querystring';
 
 const sleep = promisify(setTimeout);
@@ -24,16 +24,15 @@ const sleepyFetch = async (url: string, data?: RequestInit) => {
     return fetch(url, data);
 }
 
-export const get = async (url: string, headers?: HeadersInit, body?: BodyInit) => await sleepyFetch(url, {
+export const get = async (url: string, headers?: HeadersInit) => await sleepyFetch(url, {
     headers,
-    body,
     method: 'GET',
     redirect: 'manual'
 });
 
 export const postBase = async (url: string, headers?: HeadersInit, body?: object) => await sleepyFetch(url, {
     headers,
-    body: qs.stringify(body as unknown as ParsedUrlQueryInput), // ugly
+    body: qs.stringify(body as ParsedUrlQueryInput),
     method: 'POST',
     redirect: 'manual'
 });
@@ -42,9 +41,8 @@ export const post = async (url: string, headers?: HeadersInit, body?: object) =>
     const res = await postBase(url, headers, body);
     if (res.ok) {
         return res.json();
-    } else {
-        throw new Error("Fetch failed: " + await res.text());
     }
+    throw new Error("Fetch failed: " + await res.text());
 };
 
 export const getCookie = (res: Response) => {
