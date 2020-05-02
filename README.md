@@ -3,10 +3,11 @@ Submit your health status to your fucking department everyday
 
 ## Usage
 
-1. install dependencies: `node-fetch`, `sharp` and `tesseract.js`
-2. prepare `config.json` as described in the script
-3. use crontab or something else to run it every day
-    * Tips: `0 12 * * * sleep $(( RANDOM \% 21600 )); node /path/to/fuck.js` will run randomly from 12:00 to 18:00 everyday
+1. `yarn install`
+2. edit `config.json`
+3. `yarn build`
+4. use crontab or something else to run it every day
+    * Tips: `0 12 * * * sleep $(( RANDOM \% 21600 )); node /path/to/index.js` will run randomly from 12:00 to 18:00 everyday
         * `$RANDOM` should be supported in your shell, or you can get a 32 bits random number by running `od -vAn -N4 -tu4 < /dev/urandom`
 
 ## Q&A
