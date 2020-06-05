@@ -172,7 +172,7 @@ const fuck = async () => {
     const csrfToken = await login(username, password);
     await get(API_HEALTH);
     const { body } = await postJSON<{ RECORD_TIMES: number }>(API_RECORDED, {});
-    if (body.RECORD_TIMES === 0) {
+    if (!body.RECORD_TIMES) {
         const firstStep = await start(csrfToken);
         const nextStep = await submit(firstStep, diffField1, csrfToken);
         await submit(nextStep, diffField2, csrfToken);
