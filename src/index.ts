@@ -1,55 +1,52 @@
-import { API_CAPTCHA, API_DO_ACTION, API_ENTRY_POINT, API_LOGIN, API_LOGIN_FINISHED, API_RENDER, API_START, CONTENT_TYPE } from './constants';
-import { generateForm, get, getCookie, post, postBase, postHeaders, referrer } from './utils/request';
 import qs from 'querystring';
 
-import { recognize } from './utils/recognize';
-
+import {
+    API_CAPTCHA,
+    API_DO_ACTION,
+    API_ENTRY_POINT,
+    API_HEALTH,
+    API_LOGIN,
+    API_LOGIN_FINISHED,
+    API_RECORDED,
+    API_RENDER,
+    API_START,
+    Config
+} from './constants';
 import { desEEE } from './utils/des';
+import { recognize } from './utils/recognize';
+import { generateForm, get, postForm, postHeaders, postJSON, referrer } from './utils/request';
 
 import config from '../config.json';
-// const config = {
-//     username: 'U2010xxxxx',
-//     password: 'P@ssw0rd',
-// };
-const { username, password } = config as { username: string; password: string; };
 
-let formCookie: string;
-let csrfToken: string;
+const { username, password } = config as Config;
 
 const random = () => Math.random() * 999;
 const time = () => ~~(Date.now() / 1000);
 
 const login = async (username: string, password: string) => {
-    formCookie = getCookie(await get(API_ENTRY_POINT));
+    await get(API_ENTRY_POINT);
     const queryString = qs.stringify({ service: API_LOGIN_FINISHED });
-    const res = await get(`${API_LOGIN}?${queryString}`);
-    const loginCookie = getCookie(res);
-    const jsessionid = loginCookie.match(/(?<=JSESSIONID=).*?(?=;)/g)![0];
-    const lt = (await res.text()).match(/LT-.*?-cas/g)![0];
-    const code = await recognize(await (await get(API_CAPTCHA, { Cookie: loginCookie })).buffer());
+    const { body } = await get(`${API_LOGIN}?${queryString}`);
+    const lt = body.match(/LT-.*?-cas/g)![0];
+    const code = await recognize((await get(API_CAPTCHA)).rawBody);
     const form = {
         ul: username.length,
         pl: password.length,
         lt,
         rsa: desEEE(username + password + lt, '1', '2', '3'),
         code,
-        execution: 'e1s1', // e: count of GET, s: MAYBE count of (invalid) POST
+        execution: 'e1s1', // e: count of GETs, s: MAYBE count of (invalid) POSTs
         _eventId: 'submit'
     };
-    const redirect = (await postBase(
-        `${API_LOGIN};jsessionid=${jsessionid}?${queryString}`,
-        { 'Content-Type': CONTENT_TYPE, Cookie: loginCookie },
-        form
-    )).headers.get('Location');
+    const redirect = (await postForm(`${API_LOGIN}?${queryString}`, form)).headers.location;
     if (!redirect) {
         throw new Error("Failed to login");
     }
-    await get(redirect, { Cookie: formCookie });
-    await get(API_LOGIN_FINISHED, { Cookie: formCookie });
-    csrfToken = (await (await get(API_ENTRY_POINT, { Cookie: formCookie })).text()).match(/(?<=itemscope="csrfToken" content=").*?(?=">)/g)![0];
+    await get(redirect);
+    return ((await get(API_ENTRY_POINT)).body).match(/(?<=itemscope="csrfToken" content=").*?(?=">)/g)![0];
 };
 
-const start = async () => {
+const start = async (csrfToken: string) => {
     const form = generateForm({
         idc: "BKS",
         release: "",
@@ -58,23 +55,23 @@ const start = async () => {
             _VAR_URL_Attr: {}
         })
     }, csrfToken);
-    const res = await post(API_START, postHeaders(0, formCookie), form);
-    const { errno, entities } = res;
+    const res = await postForm(API_START, form, postHeaders(0));
+    const { errno, entities } = JSON.parse(res.body);
     if (errno !== 0) {
         throw new Error(`Failed to post /start: ${JSON.stringify(res)}`);
     }
     return +entities[0].match(/\d+/)[0];
 };
 
-const render = async (stepId: number) => {
+const render = async (stepId: number, csrfToken: string) => {
     const form = generateForm({
         stepId,
         admin: false,
         rand: random(),
         width: 1536,
     }, csrfToken);
-    const res = await post(API_RENDER, postHeaders(stepId, formCookie), form);
-    const { errno, entities } = res;
+    const res = await postForm(API_RENDER, form, postHeaders(stepId));
+    const { errno, entities } = JSON.parse(res.body);
     if (errno !== 0) {
         throw new Error(`Failed to post /render: ${JSON.stringify(res)}`);
     }
@@ -82,7 +79,7 @@ const render = async (stepId: number) => {
     return { data, fields, actionId };
 };
 
-const doAction = async (stepId: number, actionId: number, formData: string, boundFields: string) => {
+const doAction = async (stepId: number, actionId: number, formData: string, boundFields: string, csrfToken: string) => {
     const form = generateForm({
         stepId,
         actionId,
@@ -93,19 +90,19 @@ const doAction = async (stepId: number, actionId: number, formData: string, boun
         timestamp: time(),
         boundFields,
     }, csrfToken);
-    const res = await post(API_DO_ACTION, postHeaders(stepId, formCookie), form);
-    const { errno, entities } = res;
+    const res = await postForm(API_DO_ACTION, form, postHeaders(stepId));
+    const { errno, entities } = JSON.parse(res.body);
     if (errno !== 0) {
         throw new Error(`Failed to post /doAction: ${JSON.stringify(res)}`);
     }
     return entities[0].flowStepId;
 };
 
-const submit = async (stepId: number, differ: (stepId: number, data: { [key: string]: string }) => string) => {
-    const { data, fields, actionId } = await render(stepId);
+const submit = async (stepId: number, differ: (stepId: number, data: { [key: string]: string }) => string, csrfToken: string) => {
+    const { data, fields, actionId } = await render(stepId, csrfToken);
     const boundFields = Object.entries(fields).filter(([, v]) => (v as { [key: string]: string }).bound).map(([k]) => k).toString();
     const formData = differ(stepId, data);
-    return await doAction(stepId, actionId, formData, boundFields);
+    return await doAction(stepId, actionId, formData, boundFields, csrfToken);
 };
 
 const diffField1 = (stepId: number, data: { [key: string]: string }) => JSON.stringify({
@@ -172,11 +169,15 @@ const diffField2 = (stepId: number, data: { [key: string]: string }) => JSON.str
 });
 
 const fuck = async () => {
-    await login(username, password);
-    const firstStep = await start();
-    const nextStep = await submit(firstStep, diffField1);
-    await submit(nextStep, diffField2);
-    console.log(referrer(firstStep));
+    const csrfToken = await login(username, password);
+    await get(API_HEALTH);
+    const { body } = await postJSON<{ RECORD_TIMES: number }>(API_RECORDED, {});
+    if (body.RECORD_TIMES === 0) {
+        const firstStep = await start(csrfToken);
+        const nextStep = await submit(firstStep, diffField1, csrfToken);
+        await submit(nextStep, diffField2, csrfToken);
+        console.log(referrer(firstStep));
+    }
 };
 
 fuck().then();

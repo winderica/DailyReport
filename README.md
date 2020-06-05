@@ -6,14 +6,21 @@ Submit your health status to your fucking department everyday
 1. `yarn install`
 2. edit `config.json`
 3. `yarn build`
-4. use crontab or something else to run it every day
-    * Tips: `0 12 * * * sleep $(( RANDOM \% 21600 )); node /path/to/index.js` will run randomly from 12:00 to 18:00 everyday
-        * `$RANDOM` should be supported in your shell, or you can get a 32 bits random number by running `od -vAn -N4 -tu4 < /dev/urandom`
+4. use crontab or something else to run it everyday
+
+## Tips
+
+* please reinstall dependencies and rebuild it if you are from v1
+* `ua` is the most common user-agent at the moment, modify it if necessary
+* `0 12 * * * sleep $(( RANDOM \% 21600 )); node /path/to/index.js` will run randomly from 12:00 to 18:00 everyday
+* `$RANDOM` should be supported in your shell, or you can get a 32 bits random number by running `od -vAn -N4 -tu4 < /dev/urandom`
 
 ## Bonus
 
 Well, `HUST One` uses a ridiculous DES algorithm written by someone a trillion years ago to encrypt the username, password and nonce.  
-This algorithm, which receives 3 keys but differs a lot from Triple-DES, is not surprisingly incorrect.  
+This algorithm, which receives 3 keys but differs a lot from `Triple-DES`, is not surprisingly incorrect.  
+* Encryption scheme of `Triple-DES` is usually EDE, rather than EEE
+* Implementation of key expansion is wrong
 The original script is extremely disgusting, so I reimplemented it in a not so disgusting way.  
 
 ```js
