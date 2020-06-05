@@ -21,6 +21,7 @@ Well, `HUST One` uses a ridiculous DES algorithm written by someone a trillion y
 This algorithm, which receives 3 keys but differs a lot from `Triple-DES`, is not surprisingly incorrect.  
 * Encryption scheme of `Triple-DES` is usually EDE, rather than EEE
 * Implementation of key expansion is wrong
+
 The original script is extremely disgusting, so I reimplemented it in a not so disgusting way.  
 
 ```js
