@@ -1,4 +1,5 @@
 # DailyReport
+
 Submit your health status to your fucking department everyday
 
 ## Usage
@@ -10,7 +11,8 @@ Submit your health status to your fucking department everyday
 
 ## Tips
 
-* please reinstall dependencies and rebuild it if you are from v1
+* you should **manually** fill the form and submit it at least once before using this project
+* please reinstall dependencies and rebuild it if you are from v2
 * `ua` is the most common user-agent at the moment, modify it if necessary
 * `0 12 * * * sleep $(( RANDOM \% 21600 )); node /path/to/index.js` will run randomly from 12:00 to 18:00 everyday
 * `$RANDOM` should be supported in your shell, or you can get a 32 bits random number by running `od -vAn -N4 -tu4 < /dev/urandom`

@@ -33,14 +33,3 @@ export const postForm = async (url: string, form?: object, headers?: Headers) =>
     followRedirect: false,
     cookieJar,
 });
-
-export const postJSON = async <T>(url: string, json?: object, headers?: Headers) => await got.post<T>(url, {
-    headers: {
-        'user-agent': USER_AGENT,
-        ...headers
-    },
-    json,
-    followRedirect: false,
-    responseType: 'json',
-    cookieJar,
-});

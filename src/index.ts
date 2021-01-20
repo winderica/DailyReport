@@ -1,31 +1,18 @@
-import qs from 'querystring';
+import { stringify } from 'querystring';
 
-import {
-    API_CAPTCHA,
-    API_DO_ACTION,
-    API_ENTRY_POINT,
-    API_HEALTH,
-    API_LOGIN,
-    API_LOGIN_FINISHED,
-    API_RECORDED,
-    API_RENDER,
-    API_START,
-    Config
-} from './constants';
+import { API_CAPTCHA, API_DO_ACTION, API_ENTRY_POINT, API_LOGIN, API_LOGIN_FINISHED, API_RENDER, API_START } from './constants';
 import { desEEE } from './utils/des';
 import { recognize } from './utils/recognize';
-import { generateForm, get, postForm, postHeaders, postJSON, referrer } from './utils/request';
+import { generateForm, get, postForm, postHeaders, referrer } from './utils/request';
 
-import config from '../config.json';
-
-const { username, password } = config as Config;
+import { password, username } from '../config.json';
 
 const random = () => Math.random() * 999;
 const time = () => ~~(Date.now() / 1000);
 
 const login = async (username: string, password: string) => {
     await get(API_ENTRY_POINT);
-    const queryString = qs.stringify({ service: API_LOGIN_FINISHED });
+    const queryString = stringify({ service: API_LOGIN_FINISHED });
     const { body } = await get(`${API_LOGIN}?${queryString}`);
     const lt = body.match(/LT-.*?-cas/g)![0];
     const code = await recognize((await get(API_CAPTCHA)).rawBody);
@@ -58,7 +45,7 @@ const start = async (csrfToken: string) => {
     const res = await postForm(API_START, form, postHeaders(0));
     const { errno, entities } = JSON.parse(res.body);
     if (errno !== 0) {
-        throw new Error(`Failed to post /start: ${JSON.stringify(res)}`);
+        throw new Error(`Failed to post /start: ${res.body}`);
     }
     return +entities[0].match(/\d+/)[0];
 };
@@ -67,16 +54,17 @@ const render = async (stepId: number, csrfToken: string) => {
     const form = generateForm({
         stepId,
         admin: false,
+        instanceId: "",
         rand: random(),
-        width: 1536,
+        width: 1920,
     }, csrfToken);
     const res = await postForm(API_RENDER, form, postHeaders(stepId));
     const { errno, entities } = JSON.parse(res.body);
     if (errno !== 0) {
-        throw new Error(`Failed to post /render: ${JSON.stringify(res)}`);
+        throw new Error(`Failed to post /render: ${res.body}`);
     }
-    const { step: { stepId: actionId }, data, fields } = entities[0]; // Fuck, stepId in response is actually actionId
-    return { data, fields, actionId };
+    const { actions, data, fields } = entities[0];
+    return { data, fields, actionId: actions[0].id };
 };
 
 const doAction = async (stepId: number, actionId: number, formData: string, boundFields: string, csrfToken: string) => {
@@ -93,91 +81,86 @@ const doAction = async (stepId: number, actionId: number, formData: string, boun
     const res = await postForm(API_DO_ACTION, form, postHeaders(stepId));
     const { errno, entities } = JSON.parse(res.body);
     if (errno !== 0) {
-        throw new Error(`Failed to post /doAction: ${JSON.stringify(res)}`);
+        throw new Error(`Failed to post /doAction: ${res.body}`);
     }
     return entities[0].flowStepId;
 };
 
-const submit = async (stepId: number, differ: (stepId: number, data: { [key: string]: string }) => string, csrfToken: string) => {
-    const { data, fields, actionId } = await render(stepId, csrfToken);
-    const boundFields = Object.entries(fields).filter(([, v]) => (v as { [key: string]: string }).bound).map(([k]) => k).toString();
-    const formData = differ(stepId, data);
-    return await doAction(stepId, actionId, formData, boundFields, csrfToken);
-};
-
-const diffField1 = (stepId: number, data: { [key: string]: string }) => JSON.stringify({
+const diffField0 = (stepId: number, data: Record<string, string>) => JSON.stringify({
     ...data,
-    "fieldSFZCTX": "2", // 是否再次填报 1首次填报 2再次填报
-    "fieldSFYFSZZ": "2", // 身体健康状况是否发生变化 1是 2否
     "_VAR_ENTRY_NAME": "学生身体健康状况上报(_)",
     "_VAR_ENTRY_TAGS": "健康状况上报",
     "_VAR_URL": referrer(stepId),
-    "_VAR_URL_Attr": "{}",
-    "fieldCSNY": "", // 出生年月
     "fieldCS_Attr": JSON.stringify({ "_parent": "" }),
     "fieldCS_Name": "",
+    "fieldCSNY": "",
     "fieldDQ_Attr": JSON.stringify({ "_parent": "" }),
     "fieldDQ_Name": "",
     "fieldGJ_Name": "",
-    "fieldGLSJ": "", // 发热且隔离时间
-    "fieldPCSJ": "", // 疑似转排除时间
-    "fieldQRYSSJ": "", // 确认疑似时间
-    "fieldQZSJ": "", // 确诊时间
-    "fieldSFLX": "", // 上报人身份
-    "fieldSF_Name": "",
-    "fieldSqYx_Name": "",
-    "fieldSqrDqwz_Name": "",
-    "fieldWFRGLSJ": "", // 未发热且隔离时间
-    "fieldZYSJ": "", // 治愈时间
-});
-
-const diffField2 = (stepId: number, data: { [key: string]: string }) => JSON.stringify({
-    ...data,
-    "_VAR_ENTRY_NAME": `学生身体健康状况上报(_${data.fieldSqYx_Name})`,
-    "_VAR_URL": referrer(stepId),
-    "fieldBZ": "无",
-    "fieldBrsffr": "20",
-    "fieldBrsffr1": "2",
-    "fieldBrsfks": "2",
-    "fieldCS_Attr": JSON.stringify({ "_parent": data.fieldSF }),
-    "fieldDQSZWZ": "2",
-    "fieldDQ_Attr": JSON.stringify({ "_parent": data.fieldCS }),
-    "fieldGLDD": "",
     "fieldGLSJ": "",
-    "fieldJSSFKS": ["2", "2"],
-    "fieldJSSFQC": ["2", "2"],
-    "fieldJSTW": [
-        (Math.random() * 0.5 + 36.5).toFixed(1),
-        (Math.random() * 0.5 + 36.5).toFixed(1)
-    ],
-    "fieldJZQK": "",
-    "fieldJZYY": "",
-    "fieldMQJCRXM": ["父亲", "母亲"],
-    "fieldMQJCRY": "",
+    "fieldHidden1": "1",
     "fieldPCSJ": "",
     "fieldQRYSSJ": "",
     "fieldQZSJ": "",
-    "fieldSFWQZYSBL": "2",
-    "fieldSFYFSZZ": "2",
-    "fieldSFZCTX": "2",
-    "fieldSFZWGL": "",
-    "fieldSqrzzqt": "1",
+    "fieldSbsj": "",
+    "fieldSF_Name": "",
+    "fieldSFLX": "",
+    "fieldSqrDqwz_Name": "",
+    "fieldSqrzzqt1": "",
+    "fieldSqYx_Name": "",
     "fieldWFRGLSJ": "",
-    "fieldXBFZ_Name": "",
-    "fieldXSZLB": (Math.random() * 0.5 + 36.5).toFixed(1),
-    "groupMQJCList": [0, 1]
+    "fieldZYSJ": "",
+    "groupMQJCList": [],
+    "groupYQRBList": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
 });
 
-const fuck = async () => {
-    const csrfToken = await login(username, password);
-    await get(API_HEALTH);
-    const { body } = await postJSON<{ RECORD_TIMES: number }>(API_RECORDED, {});
-    if (!body.RECORD_TIMES) {
-        const firstStep = await start(csrfToken);
-        const nextStep = await submit(firstStep, diffField1, csrfToken);
-        await submit(nextStep, diffField2, csrfToken);
-        console.log(referrer(firstStep));
-    }
-};
+const diffField1 = (stepId: number, data: Record<string, string>) => JSON.stringify({
+    ...data,
+    "_VAR_URL": referrer(stepId),
+    "fieldCSNY": "",
+    "fieldGLSJ": "",
+    "fieldPCSJ": "",
+    "fieldQRYSSJ": "",
+    "fieldQZSJ": "",
+    "fieldSFLX": "",
+    "fieldWFRGLSJ": "",
+    "fieldZYSJ": "",
+    "groupMQJCList": []
+});
 
-fuck().then();
+const diffField2 = (stepId: number, data: Record<string, string>) => JSON.stringify({
+    ...data,
+    "_VAR_ENTRY_NAME": `学生身体健康状况上报(${data.fieldSqrXm}_${data.fieldSqYx_Name})`,
+    "_VAR_URL": referrer(stepId),
+    "fieldBZ": "无",
+    "fieldGLSJ": "",
+    "fieldJSTW": [
+        (Math.random() * 0.9 + 36).toFixed(1),
+        (Math.random() * 0.9 + 36).toFixed(1)
+    ],
+    "fieldPCSJ": "",
+    "fieldQRYSSJ": "",
+    "fieldQZSJ": "",
+    "fieldWFRGLSJ": "",
+    "fieldXBFZ_Name": "",
+    "fieldXSZLB": (Math.random() * 0.9 + 36).toFixed(1),
+    "fieldZYSJ": "",
+    "groupMQJCList": [0, 1],
+    "groupYQRBList": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+});
+
+(async () => {
+    const csrfToken = await login(username, password);
+    let stepId = await start(csrfToken);
+    const url = referrer(stepId);
+    for (const differ of [diffField0, diffField1, diffField2]) {
+        const { data, fields, actionId } = await render(stepId, csrfToken);
+        if (data.fieldRBDTTBQK === '已') {
+            return;
+        }
+        const boundFields = Object.entries<Record<string, string>>(fields).filter(([, v]) => v.bound).map(([k]) => k).toString();
+        const formData = differ(stepId, data);
+        stepId = await doAction(stepId, actionId, formData, boundFields, csrfToken);
+    }
+    console.log(url);
+})();

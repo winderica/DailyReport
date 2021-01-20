@@ -1,9 +1,6 @@
 import sharp from 'sharp';
-import fs from 'fs';
-import path from 'path';
-import { promisify } from 'util';
-
-const readFile = promisify(fs.readFile);
+import { readFileSync } from 'fs';
+import { dirname, resolve } from 'path';
 
 const transpose = (data: Buffer, width: number) => {
     return [...new Array(width).keys()].map((i) => [...data].filter((_, j) => j % width === i))
@@ -27,7 +24,7 @@ export const recognize = async (buffer: Buffer) => {
         .toColourspace('b-w')
         .threshold(254)
         .raw().toBuffer();
-    const digitsImage = await readFile(path.resolve(path.dirname(require.main!.filename), '../assets', 'digits.png'));
+    const digitsImage = readFileSync(resolve(dirname(require.main!.filename), '../assets', 'digits.png'));
     const digits = transpose(await sharp(digitsImage).toColourspace('b-w').raw().toBuffer(), 180);
     const pixels = [[...new Array(20)].map(() => 255), ...transpose(data, 87)];
     return [...new Array(4).keys()].map((i) => match(pixels.slice(i * 22, i * 22 + 18), digits)).join('');
