@@ -64,7 +64,7 @@ const render = async (stepId: number, csrfToken: string) => {
         throw new Error(`Failed to post /render: ${res.body}`);
     }
     const { actions, data, fields } = entities[0];
-    return { data, fields, actionId: actions[0].id };
+    return { data, fields, actionId: actions.filter(({ code }: { code: string }) => code.toUpperCase() === 'TJ')[0].id };
 };
 
 const doAction = async (stepId: number, actionId: number, formData: string, boundFields: string, csrfToken: string) => {
