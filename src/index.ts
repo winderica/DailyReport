@@ -111,56 +111,38 @@ const diffField0 = (stepId: number, data: Record<string, string>) => JSON.string
     "fieldWFRGLSJ": "",
     "fieldZYSJ": "",
     "groupMQJCList": [],
-    "groupYQRBList": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+    "groupYQRBList": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+    ],
 });
 
 const diffField1 = (stepId: number, data: Record<string, string>) => JSON.stringify({
     ...data,
     "_VAR_URL": referrer(stepId),
-    "fieldCSNY": "",
-    "fieldGLSJ": "",
-    "fieldPCSJ": "",
-    "fieldQRYSSJ": "",
-    "fieldQZSJ": "",
-    "fieldSFLX": "",
-    "fieldWFRGLSJ": "",
-    "fieldZYSJ": "",
-    "groupMQJCList": []
-});
-
-const diffField2 = (stepId: number, data: Record<string, string>) => JSON.stringify({
-    ...data,
-    "_VAR_ENTRY_NAME": `学生身体健康状况上报(${data.fieldSqrXm}_${data.fieldSqYx_Name})`,
-    "_VAR_URL": referrer(stepId),
-    "fieldBZ": "无",
-    "fieldGLSJ": "",
-    "fieldJSTW": [
-        (Math.random() * 0.9 + 36).toFixed(1),
-        (Math.random() * 0.9 + 36).toFixed(1)
-    ],
-    "fieldPCSJ": "",
-    "fieldQRYSSJ": "",
-    "fieldQZSJ": "",
-    "fieldWFRGLSJ": "",
-    "fieldXBFZ_Name": "",
     "fieldXSZLB": (Math.random() * 0.9 + 36).toFixed(1),
-    "fieldZYSJ": "",
-    "groupMQJCList": [0, 1],
-    "groupYQRBList": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
 });
 
 (async () => {
     const csrfToken = await login(username, password);
     let stepId = await start(csrfToken);
     const url = referrer(stepId);
-    for (const differ of [diffField0, diffField1, diffField2]) {
+    let i = 0;
+    for (const differ of [diffField0, diffField1]) {
         const { data, fields, actionId } = await render(stepId, csrfToken);
         if (data.fieldRBDTTBQK === '已') {
+            console.log(data.fieldRBDTTBQK)
             return;
         }
         const boundFields = Object.entries<Record<string, string>>(fields).filter(([, v]) => v.bound).map(([k]) => k).toString();
         const formData = differ(stepId, data);
         stepId = await doAction(stepId, actionId, formData, boundFields, csrfToken);
+        console.log(i)
     }
     console.log(url);
 })();
